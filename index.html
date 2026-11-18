@@ -65,7 +65,7 @@
   <script>
     const API_BASE = 'https://cvg5qiledk.g5.sqlite.cloud';
     const DB_NAME = 'vp.sqlite';
-    const ADMIN_API_KEY = '1Pxba4tZnf9BBfSMr5FLjV349XjdGr9b02huN';
+    const ADMIN_API_KEY = '1Pxba4tZnf9BBfSMr5FLjV349XjdGr9b02huNXE7NWY';
     const ADMIN_PASS = 'admin123';
     const $ = (s) => document.querySelector(s);
     const show = (el, v = true) => el.style.display = v ? '' : 'none';
@@ -78,15 +78,13 @@
     }
     let authed = false;
     async function sqliteSql(sql) {
-      const url = `${API_BASE}/v2/weblite/sql`;
+      const url = `${API_BASE}/v2/weblite/sql?sql=${encodeURIComponent(sql)}&database=${encodeURIComponent(DB_NAME)}`;
       const res = await fetch(url, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'accept': 'application/json',
-          'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + ADMIN_API_KEY
-        },
-        body: JSON.stringify({ sql: sql, database: DB_NAME })
+        }
       });
       const data = await res.json();
       if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + JSON.stringify(data));
