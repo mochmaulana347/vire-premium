@@ -7,11 +7,12 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, Tahoma, sans-serif; background: #121212; color: #e8e8e8; min-height: 100vh; }
-    .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+    .container { max-width: 980px; margin: 0 auto; padding: 24px; }
     h1 { font-size: 20px; margin-bottom: 16px; color: #f3f3f3; }
     .card { background: #1b1b1b; border: 1px solid #333; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
     label { display: block; font-size: 12px; color: #aaa; margin-bottom: 6px; font-weight: 600; }
-    input[type="text"], input[type="password"] { width: 100%; padding: 10px 12px; background: #0f0f0f; border: 1px solid #444; border-radius: 6px; color: #e8e8e8; font-size: 13px; margin-bottom: 10px; }
+    input[type="text"], input[type="password"], select { width: 100%; padding: 10px 12px; background: #0f0f0f; border: 1px solid #444; border-radius: 6px; color: #e8e8e8; font-size: 13px; margin-bottom: 10px; }
+    select { cursor: pointer; }
     button { background: #333; border: 1px solid #555; color: #e8e8e8; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s; }
     button:hover { background: #444; }
     button.primary { background: #2a2a2a; border-color: #666; color: #fff; }
@@ -23,60 +24,92 @@
     td { padding: 10px; border-bottom: 1px solid #222; color: #e8e8e8; vertical-align: middle; }
     tr:hover { background: #1f1f1f; }
     .status-active { color: #4caf50; font-weight: 700; }
-    .status-off { color: #999; }
+    .status-off { color: #f5a623; font-weight: 700; }
     .key-badge { font-family: monospace; background: #0a0a0a; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; color: #f3f3f3; font-size: 12px; cursor: pointer; user-select: none; }
-    .msg { margin-top: 8px; padding: 10px; border-radius: 6px; font-size: 12px; display: none; }
+    .msg { margin-top: 8px; padding: 10px; border-radius: 6px; font-size: 12px; display: none; white-space: pre-wrap; word-break: break-word; }
     .msg.ok { background: #1b3a1b; border: 1px solid #3a7a3a; color: #8f8; }
     .msg.err { background: #3a1b1b; border: 1px solid #7a3a3a; color: #f88; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .btn-group { display: flex; gap: 6px; }
+    .row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+    .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
     .locked { opacity: 0.6; pointer-events: none; }
     .loading { text-align: center; padding: 20px; color: #888; }
     .copy-tip { font-size: 10px; color: #666; margin-top: 4px; }
+    .hint { font-size: 11px; color: #888; margin-top: 4px; }
+    .remain { color: #aaa; font-size: 12px; }
+    .remain.soon { color: #f5a623; font-weight: 700; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Vire Premium — Admin Panel</h1>
+
+    <!-- Login -->
     <div id="login" class="card">
       <label>Password Admin</label>
       <input type="password" id="adminPass" placeholder="Masukkan password admin" />
       <button id="btnLogin" class="primary">Masuk</button>
       <div id="msgLogin" class="msg"></div>
     </div>
+
+    <!-- Panel Utama -->
     <div id="admin" class="card locked">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <div><strong>Kelola Lisensi</strong></div>
         <button id="btnLogout" style="background:#444;border-color:#666;color:#fff;">Keluar</button>
       </div>
+
       <div class="row">
-        <div style="flex:1;">
+        <div style="flex:1;min-width:140px;">
           <label>Prefix Key</label>
           <input type="text" id="keyPrefix" value="VIPRE-" />
         </div>
+        <div style="flex:1;min-width:140px;">
+          <label>Durasi</label>
+          <select id="keyDuration">
+            <option value="3600000">1 Jam</option>
+            <option value="21600000">6 Jam</option>
+            <option value="43200000">12 Jam</option>
+            <option value="86400000" selected>1 Hari</option>
+            <option value="259200000">3 Hari</option>
+            <option value="604800000">7 Hari</option>
+            <option value="2592000000">30 Hari</option>
+            <option value="7776000000">90 Hari</option>
+            <option value="never">Tanpa batas</option>
+          </select>
+        </div>
         <button id="btnGen" class="primary">Generate Key</button>
       </div>
+      <div class="hint">Generate membuat 1 key baru dengan durasi yang dipilih. Key terhapus otomatis saat durasinya habis.</div>
+
       <div id="msgGen" class="msg"></div>
+
       <label style="margin-top:8px;">Daftar Key</label>
       <div id="keyList" class="loading">Memuat...</div>
       <div id="msgList" class="msg"></div>
     </div>
   </div>
+
   <script>
+    // ==================== KONFIG ====================
     const API_BASE = 'https://cvg5qiledk.g5.sqlite.cloud';
     const DB_NAME = 'vp.sqlite';
-    const ADMIN_API_KEY = '1Pxba4tZnf9BBfSMr5FLjV349XjdGr9b02huNXE7NWY';
+    const ADMIN_API_KEY = '__ADMIN_API_KEY__';
     const ADMIN_PASS = 'admin123';
+    // ================================================
+
     const $ = (s) => document.querySelector(s);
     const show = (el, v = true) => el.style.display = v ? '' : 'none';
+
     function setMsg(id, text, type) {
       const m = $(id);
       m.textContent = text;
       m.className = 'msg ' + (type || 'err');
       show(m, true);
-      setTimeout(() => show(m, false), 5000);
+      setTimeout(() => show(m, false), 8000);
     }
+
     let authed = false;
+
     async function sqliteSql(sql) {
       const url = `${API_BASE}/v2/weblite/sql?sql=${encodeURIComponent(sql)}&database=${encodeURIComponent(DB_NAME)}`;
       const res = await fetch(url, {
@@ -86,19 +119,68 @@
           'Authorization': 'Bearer ' + ADMIN_API_KEY
         }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + JSON.stringify(data));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + JSON.stringify(data));
       return data;
     }
+
     function escSql(s) { return String(s).replace(/'/g, "''"); }
+
+    // Format Date -> "YYYY-MM-DD HH:MM:SS" (UTC) agar perbandingan teks dengan datetime('now') benar.
+    function toSqlUtc(d) {
+      const p = (n) => String(n).padStart(2, '0');
+      return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' +
+             p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+    }
+
+    // Parse "YYYY-MM-DD HH:MM:SS" (UTC) -> Date. Kembalikan null kalau kosong/tidak valid.
+    function parseSqlUtc(s) {
+      if (!s) return null;
+      const d = new Date(String(s).replace(' ', 'T') + 'Z');
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Sisa waktu -> "6 hari 3 jam" / "5 jam 12 mnt" / "45 mnt" / "Tanpa batas".
+    function fmtRemaining(expiresAt) {
+      if (!expiresAt) return 'Tanpa batas';
+      const d = parseSqlUtc(expiresAt);
+      if (!d) return '-';
+      let ms = d.getTime() - Date.now();
+      if (ms <= 0) return 'Kedaluarsa';
+      const min = Math.floor(ms / 60000);
+      const jam = Math.floor(min / 60);
+      const hari = Math.floor(jam / 24);
+      if (hari > 0) return hari + ' hari ' + (jam % 24) + ' jam';
+      if (jam > 0) return jam + ' jam ' + (min % 60) + ' mnt';
+      return min + ' mnt';
+    }
+
+    // Hapus key yang sudah kedaluarsa (auto-delete). Dijalankan tiap kali daftar dimuat.
+    async function cleanupExpired() {
+      try {
+        await sqliteSql(`DELETE FROM license_keys WHERE expires_at IS NOT NULL AND expires_at != '' AND expires_at <= datetime('now');`);
+      } catch (e) {
+        // Abaikan: tabel/kolom belum ada akan dibuat oleh initDb.
+      }
+    }
+
+    // Inisialisasi tabel + migrasi kolom expires_at (untuk tabel lama) + bersih-bersih.
     async function initDb() {
       try {
-        await sqliteSql(`CREATE TABLE IF NOT EXISTS license_keys (key TEXT PRIMARY KEY, status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now','localtime')), updated_at TEXT DEFAULT (datetime('now','localtime')));`);
+        await sqliteSql(`CREATE TABLE IF NOT EXISTS license_keys (key TEXT PRIMARY KEY, status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now','localtime')), updated_at TEXT DEFAULT (datetime('now','localtime')), expires_at TEXT);`);
+        try {
+          await sqliteSql(`ALTER TABLE license_keys ADD COLUMN expires_at TEXT;`);
+        } catch (e) {
+          // Kolom sudah ada -> abaikan.
+        }
+        await cleanupExpired();
         return true;
       } catch (e) {
         return false;
       }
     }
+
+    // Login
     $('#btnLogin').addEventListener('click', async () => {
       const pass = $('#adminPass').value;
       if (pass === ADMIN_PASS) {
@@ -111,37 +193,65 @@
         setMsg('msgLogin', 'Password salah', 'err');
       }
     });
+
     $('#btnLogout').addEventListener('click', () => {
       authed = false;
       $('#admin').classList.add('locked');
       $('#login').classList.remove('locked');
       $('#keyList').innerHTML = 'Memuat...';
     });
+
+    // Generate Key (1 key, dengan durasi yang dipilih)
     $('#btnGen').addEventListener('click', async () => {
       const prefix = $('#keyPrefix').value || 'VIPRE-';
       const key = prefix + crypto.getRandomValues(new Uint8Array(16)).reduce((s, b) => s + b.toString(16).padStart(2, '0'), '').toUpperCase();
+      const dur = $('#keyDuration').value;
+      let expiresAt = null;
+      if (dur !== 'never') {
+        expiresAt = toSqlUtc(new Date(Date.now() + parseInt(dur, 10)));
+      }
       try {
-        await sqliteSql(`INSERT INTO license_keys (key, status) VALUES ('${escSql(key)}', 'active');`);
-        setMsg('msgGen', 'Key baru: ' + key, 'ok');
+        await sqliteSql(`INSERT INTO license_keys (key, status, expires_at) VALUES ('${escSql(key)}', 'active', ${expiresAt ? "'" + escSql(expiresAt) + "'" : 'NULL'});`);
+        setMsg('msgGen', 'Key baru: ' + key + (expiresAt ? '\nBerakhir: ' + expiresAt + ' (UTC)' : '\nTanpa batas'), 'ok');
         loadKeys();
       } catch (e) {
         setMsg('msgGen', 'Gagal: ' + e.message, 'err');
       }
     });
+
+    // List Keys
     async function loadKeys() {
       const list = $('#keyList');
       list.innerHTML = 'Memuat...';
       try {
-        const data = await sqliteSql(`SELECT key, status, created_at FROM license_keys ORDER BY created_at DESC LIMIT 100;`);
+        await cleanupExpired();
+        const data = await sqliteSql(`SELECT key, status, created_at, expires_at FROM license_keys ORDER BY created_at DESC LIMIT 100;`);
         const rows = data.data || [];
         if (!rows.length) {
           list.innerHTML = '<div style="color:#888;padding:12px;">Belum ada key. Generate dulu.</div>';
           return;
         }
-        let html = '<table><thead><tr><th style="width:260px;">Key</th><th style="width:90px;">Status</th><th style="width:140px;">Dibuat</th><th style="width:160px;">Aksi</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th style="width:230px;">Key</th><th style="width:80px;">Status</th><th style="width:120px;">Dibuat</th><th style="width:130px;">Berakhir (UTC)</th><th style="width:100px;">Sisa</th><th style="width:190px;">Aksi</th></tr></thead><tbody>';
         for (const row of rows) {
           const isActive = row.status === 'active';
-          html += `<tr><td><span class="key-badge" onclick="copyKey(this, '${row.key}')" title="Klik untuk salin">${row.key}</span></td><td><span class="status-${isActive ? 'active' : 'off'}">${isActive ? 'AKTIF' : 'NONAKTIF'}</span></td><td>${row.created_at || '-'}</td><td><div class="btn-group"><button class="btn-action" onclick="toggleKey('${row.key}', ${!isActive})">${isActive ? 'Matikan' : 'Aktifkan'}</button><button class="danger btn-action" onclick="deleteKey('${row.key}')">Hapus</button></div></td></tr>`;
+          const exp = row.expires_at || '';
+          const remain = fmtRemaining(exp);
+          const soon = exp && remain !== 'Tanpa batas' && remain !== 'Kedaluarsa' && parseSqlUtc(exp) && (parseSqlUtc(exp).getTime() - Date.now() < 86400000);
+          const expJs = exp.replace(/'/g, "\\'");
+          html += `<tr>
+            <td><span class="key-badge" onclick="copyKey(this, '${row.key.replace(/'/g, "\\'")}')" title="Klik untuk salin">${row.key}</span></td>
+            <td><span class="status-${isActive ? 'active' : 'off'}">${isActive ? 'AKTIF' : 'PAUSED'}</span></td>
+            <td>${row.created_at || '-'}</td>
+            <td>${exp || 'Tanpa batas'}</td>
+            <td><span class="remain${soon ? ' soon' : ''}">${remain}</span></td>
+            <td>
+              <div class="btn-group">
+                <button class="btn-action" onclick="toggleKey('${row.key.replace(/'/g, "\\'")}', ${!isActive})">${isActive ? 'Pause' : 'Lanjutkan'}</button>
+                <button class="btn-action" onclick="extendKey('${row.key.replace(/'/g, "\\'")}', '${expJs}')">Perpanjang</button>
+                <button class="danger btn-action" onclick="deleteKey('${row.key.replace(/'/g, "\\'")}')">Hapus</button>
+              </div>
+            </td>
+          </tr>`;
         }
         html += '</tbody></table>';
         list.innerHTML = html;
@@ -149,11 +259,15 @@
         list.innerHTML = '<div style="color:#f88;">Gagal memuat: ' + e.message + '</div>';
       }
     }
+
+    // Tambah fungsi ke window
     window.copyKey = function(el, key) {
       navigator.clipboard.writeText(key);
       el.textContent = 'DISALIN';
       setTimeout(() => el.textContent = key, 1200);
     };
+
+    // Pause / Lanjutkan (toggle status active <-> inactive)
     window.toggleKey = async function(key, active) {
       try {
         const status = active ? 'active' : 'inactive';
@@ -163,6 +277,29 @@
         setMsg('msgList', 'Gagal update: ' + e.message, 'err');
       }
     };
+
+    // Perpanjang: tambah durasi dari tanggal berakhir saat ini (atau dari sekarang kalau tanpa batas/kedaluarsa).
+    window.extendKey = async function(key, currentExpires) {
+      const input = prompt('Tambah durasi berapa hari? (isi angka, contoh: 7)', '7');
+      if (input === null) return;
+      const days = parseInt(input, 10);
+      if (isNaN(days) || days <= 0) {
+        setMsg('msgList', 'Masukkan jumlah hari yang valid (angka > 0).', 'err');
+        return;
+      }
+      let base = Date.now();
+      const cur = parseSqlUtc(currentExpires);
+      if (cur && cur.getTime() > Date.now()) base = cur.getTime();
+      const newExp = toSqlUtc(new Date(base + days * 86400000));
+      try {
+        await sqliteSql(`UPDATE license_keys SET expires_at = '${escSql(newExp)}', updated_at = datetime('now','localtime') WHERE key = '${escSql(key)}';`);
+        setMsg('msgList', 'Key diperpanjang sampai ' + newExp + ' (UTC).', 'ok');
+        loadKeys();
+      } catch (e) {
+        setMsg('msgList', 'Gagal perpanjang: ' + e.message, 'err');
+      }
+    };
+
     window.deleteKey = async function(key) {
       if (!confirm('Hapus key ini?')) return;
       try {
@@ -172,6 +309,8 @@
         setMsg('msgList', 'Gagal hapus: ' + e.message, 'err');
       }
     };
+
+    // Inisialisasi
     (async () => {
       await initDb();
     })();
