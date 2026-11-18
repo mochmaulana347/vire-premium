@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vire Premium — Admin Panel</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, Tahoma, sans-serif; background: #121212; color: #e8e8e8; min-height: 100vh; }
+    .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 20px; margin-bottom: 16px; color: #f3f3f3; }
+    .card { background: #1b1b1b; border: 1px solid #333; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; color: #aaa; margin-bottom: 6px; font-weight: 600; }
+    input[type="text"], input[type="password"] { width: 100%; padding: 10px 12px; background: #0f0f0f; border: 1px solid #444; border-radius: 6px; color: #e8e8e8; font-size: 13px; margin-bottom: 10px; }
+    button { background: #333; border: 1px solid #555; color: #e8e8e8; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s; }
+    button:hover { background: #444; }
+    button.primary { background: #2a2a2a; border-color: #666; color: #fff; }
+    button.primary:hover { background: #3a3a3a; }
+    button.danger { border-color: #633; color: #f88; }
+    button.danger:hover { background: #3a2222; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    th { text-align: left; color: #aaa; padding: 10px; border-bottom: 1px solid #333; font-weight: 600; }
+    td { padding: 10px; border-bottom: 1px solid #222; color: #e8e8e8; vertical-align: middle; }
+    tr:hover { background: #1f1f1f; }
+    .status-active { color: #4caf50; font-weight: 700; }
+    .status-off { color: #999; }
+    .key-badge { font-family: monospace; background: #0a0a0a; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; color: #f3f3f3; font-size: 12px; cursor: pointer; user-select: none; }
+    .msg { margin-top: 8px; padding: 10px; border-radius: 6px; font-size: 12px; display: none; }
+    .msg.ok { background: #1b3a1b; border: 1px solid #3a7a3a; color: #8f8; }
+    .msg.err { background: #3a1b1b; border: 1px solid #7a3a3a; color: #f88; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-group { display: flex; gap: 6px; }
+    .locked { opacity: 0.6; pointer-events: none; }
+    .loading { text-align: center; padding: 20px; color: #888; }
+    .copy-tip { font-size: 10px; color: #666; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Vire Premium — Admin Panel</h1>
+    <div id="login" class="card">
+      <label>Password Admin</label>
+      <input type="password" id="adminPass" placeholder="Masukkan password admin" />
+      <button id="btnLogin" class="primary">Masuk</button>
+      <div id="msgLogin" class="msg"></div>
+    </div>
+    <div id="admin" class="card locked">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div><strong>Kelola Lisensi</strong></div>
+        <button id="btnLogout" style="background:#444;border-color:#666;color:#fff;">Keluar</button>
+      </div>
+      <div class="row">
+        <div style="flex:1;">
+          <label>Prefix Key</label>
+          <input type="text" id="keyPrefix" value="VIPRE-" />
+        </div>
+        <button id="btnGen" class="primary">Generate Key</button>
+      </div>
+      <div id="msgGen" class="msg"></div>
+      <label style="margin-top:8px;">Daftar Key</label>
+      <div id="keyList" class="loading">Memuat...</div>
+      <div id="msgList" class="msg"></div>
+    </div>
+  </div>
+  <script>
+    const API_BASE = 'https://cvg5qiledk.g5.sqlite.cloud';
+    const DB_NAME = 'vp.sqlite';
+    const ADMIN_API_KEY = '1Pxba4tZnf9BBfSMr5FLjV349XjdGr9b02huN';
+    const ADMIN_PASS = 'admin123';
+    const $ = (s) => document.querySelector(s);
+    const show = (el, v = true) => el.style.display = v ? '' : 'none';
+    function setMsg(id, text, type) {
+      const m = $(id);
+      m.textContent = text;
+      m.className = 'msg ' + (type || 'err');
+      show(m, true);
+      setTimeout(() => show(m, false), 5000);
+    }
+    let authed = false;
+    async function sqliteSql(sql) {
+      const url = `${API_BASE}/v2/weblite/sql?sql=${encodeURIComponent(sql)}&database=${encodeURIComponent(DB_NAME)}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer ' + ADMIN_API_KEY
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.reason || ('HTTP ' + res.status));
+      return data;
+    }
+    function escSql(s) { return String(s).replace(/'/g, "''"); }
+    async function initDb() {
+      try {
+        await sqliteSql(`CREATE TABLE IF NOT EXISTS license_keys (key TEXT PRIMARY KEY, status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now','localtime')), updated_at TEXT DEFAULT (datetime('now','localtime')));`);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    $('#btnLogin').addEventListener('click', async () => {
+      const pass = $('#adminPass').value;
+      if (pass === ADMIN_PASS) {
+        authed = true;
+        $('#admin').classList.remove('locked');
+        $('#login').classList.add('locked');
+        $('#adminPass').value = '';
+        loadKeys();
+      } else {
+        setMsg('msgLogin', 'Password salah', 'err');
+      }
+    });
+    $('#btnLogout').addEventListener('click', () => {
+      authed = false;
+      $('#admin').classList.add('locked');
+      $('#login').classList.remove('locked');
+      $('#keyList').innerHTML = 'Memuat...';
+    });
+    $('#btnGen').addEventListener('click', async () => {
+      const prefix = $('#keyPrefix').value || 'VIPRE-';
+      const key = prefix + crypto.getRandomValues(new Uint8Array(16)).reduce((s, b) => s + b.toString(16).padStart(2, '0'), '').toUpperCase();
+      try {
+        await sqliteSql(`INSERT INTO license_keys (key, status) VALUES ('${escSql(key)}', 'active');`);
+        setMsg('msgGen', 'Key baru: ' + key, 'ok');
+        loadKeys();
+      } catch (e) {
+        setMsg('msgGen', 'Gagal: ' + e.message, 'err');
+      }
+    });
+    async function loadKeys() {
+      const list = $('#keyList');
+      list.innerHTML = 'Memuat...';
+      try {
+        const data = await sqliteSql(`SELECT key, status, created_at FROM license_keys ORDER BY created_at DESC LIMIT 100;`);
+        const rows = data.data || [];
+        if (!rows.length) {
+          list.innerHTML = '<div style="color:#888;padding:12px;">Belum ada key. Generate dulu.</div>';
+          return;
+        }
+        let html = '<table><thead><tr><th style="width:260px;">Key</th><th style="width:90px;">Status</th><th style="width:140px;">Dibuat</th><th style="width:160px;">Aksi</th></tr></thead><tbody>';
+        for (const row of rows) {
+          const isActive = row.status === 'active';
+          html += `<tr><td><span class="key-badge" onclick="copyKey(this, '${row.key}')" title="Klik untuk salin">${row.key}</span></td><td><span class="status-${isActive ? 'active' : 'off'}">${isActive ? 'AKTIF' : 'NONAKTIF'}</span></td><td>${row.created_at || '-'}</td><td><div class="btn-group"><button class="btn-action" onclick="toggleKey('${row.key}', ${!isActive})">${isActive ? 'Matikan' : 'Aktifkan'}</button><button class="danger btn-action" onclick="deleteKey('${row.key}')">Hapus</button></div></td></tr>`;
+        }
+        html += '</tbody></table>';
+        list.innerHTML = html;
+      } catch (e) {
+        list.innerHTML = '<div style="color:#f88;">Gagal memuat: ' + e.message + '</div>';
+      }
+    }
+    window.copyKey = function(el, key) {
+      navigator.clipboard.writeText(key);
+      el.textContent = 'DISALIN';
+      setTimeout(() => el.textContent = key, 1200);
+    };
+    window.toggleKey = async function(key, active) {
+      try {
+        const status = active ? 'active' : 'inactive';
+        await sqliteSql(`UPDATE license_keys SET status = '${status}', updated_at = datetime('now','localtime') WHERE key = '${escSql(key)}';`);
+        loadKeys();
+      } catch (e) {
+        setMsg('msgList', 'Gagal update: ' + e.message, 'err');
+      }
+    };
+    window.deleteKey = async function(key) {
+      if (!confirm('Hapus key ini?')) return;
+      try {
+        await sqliteSql(`DELETE FROM license_keys WHERE key = '${escSql(key)}';`);
+        loadKeys();
+      } catch (e) {
+        setMsg('msgList', 'Gagal hapus: ' + e.message, 'err');
+      }
+    };
+    (async () => {
+      await initDb();
+    })();
+  </script>
+</body>
+</html>
