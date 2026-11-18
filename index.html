@@ -78,13 +78,15 @@
     }
     let authed = false;
     async function sqliteSql(sql) {
-      const url = `${API_BASE}/v2/weblite/sql?sql=${encodeURIComponent(sql)}&database=${encodeURIComponent(DB_NAME)}`;
+      const url = `${API_BASE}/v2/weblite/sql`;
       const res = await fetch(url, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'accept': 'application/json',
+          'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + ADMIN_API_KEY
-        }
+        },
+        body: JSON.stringify({ sql: sql, database: DB_NAME })
       });
       const data = await res.json();
       if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + JSON.stringify(data));
