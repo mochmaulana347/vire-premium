@@ -87,7 +87,7 @@
         }
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.reason || ('HTTP ' + res.status));
+      if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + JSON.stringify(data));
       return data;
     }
     function escSql(s) { return String(s).replace(/'/g, "''"); }
